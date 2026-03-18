@@ -12,7 +12,7 @@ sns.set_theme(style="whitegrid")
 class ApiaryComparator:
     def __init__(self, root):
         self.root = root
-        self.root.title("Porovnanie Včelníc 2.0 - Detailná Analýza")
+        self.root.title("AOBF statystic 2.0")
         self.root.geometry("650x500")
 
         self.df_a = None

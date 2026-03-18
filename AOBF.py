@@ -10,7 +10,7 @@ class ManualBeeAnalyzer:
         self.root.title(" Analysys of beeswax foundations 4.0 ")
         self.root.geometry("1200x800")
 
-        # --- Dátové premenné ---
+        # -- Dátové premenné --
         self.file_paths = []
         self.current_index = 0
         self.results_data = []

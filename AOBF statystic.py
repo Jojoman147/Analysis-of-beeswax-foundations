@@ -13,7 +13,7 @@ sns.set_theme(style="whitegrid")
 class BeeStatAnalyzer:
     def __init__(self, root):
         self.root = root
-        self.root.title("Včelár Štatistika 3.0 - Vedecká analýza")
+        self.root.title("AOBF statystic 3.0")
         self.root.geometry("650x600")
 
         self.data_frames = {} 
