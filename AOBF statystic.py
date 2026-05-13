@@ -7,37 +7,37 @@ from scipy import stats
 import os
 import numpy as np
 
-# Nastavenie vizuálu
+# Visual settings for publication-quality charts
 sns.set_theme(style="whitegrid")
 
 class BeeStatAnalyzer:
     def __init__(self, root):
         self.root = root
-        self.root.title("AOBF statystic 3.0")
+        self.root.title("AOBF Statistics 4.0 (Mann-Whitney + Post-Hoc)")
         self.root.geometry("650x600")
 
         self.data_frames = {} 
         self.merged_df = None
 
-        # --- GUI ---
-        tk.Label(root, text="Vedecká analýza 3 meraní", font=("Arial", 16, "bold")).pack(pady=10)
-        tk.Label(root, text="(Porovnanie voči 0% parafínu + Štandardná odchýlka)", font=("Arial", 10)).pack(pady=5)
+        # --- GUI Setup ---
+        tk.Label(root, text="Scientific Analysis (Post-Hoc Version)", font=("Arial", 16, "bold")).pack(pady=10)
+        tk.Label(root, text="(Mann-Whitney Test + Bonferroni Post-Hoc Correction)", font=("Arial", 10)).pack(pady=5)
 
-        self.btn_1 = tk.Button(root, text="1. Načítať Prvé Meranie", command=lambda: self.load_file(1), width=45)
+        self.btn_1 = tk.Button(root, text="1. Load First Measurement", command=lambda: self.load_file(1), width=45)
         self.btn_1.pack(pady=5)
         
-        self.btn_2 = tk.Button(root, text="2. Načítať Druhé Meranie", command=lambda: self.load_file(2), width=45)
+        self.btn_2 = tk.Button(root, text="2. Load Second Measurement", command=lambda: self.load_file(2), width=45)
         self.btn_2.pack(pady=5)
         
-        self.btn_3 = tk.Button(root, text="3. Načítať Tretie Meranie", command=lambda: self.load_file(3), width=45)
+        self.btn_3 = tk.Button(root, text="3. Load Third Measurement", command=lambda: self.load_file(3), width=45)
         self.btn_3.pack(pady=5)
 
         tk.Label(root, text="------------------------------------------------", pady=10).pack()
 
-        self.btn_run = tk.Button(root, text="GENERUJ GRAFY A ŠTATISTIKU", command=self.run_analysis, bg="#aaffaa", font=("Arial", 11, "bold"), state=tk.DISABLED, height=2)
+        self.btn_run = tk.Button(root, text="GENERATE CHARTS AND STATISTICS", command=self.run_analysis, bg="#aaffaa", font=("Arial", 11, "bold"), state=tk.DISABLED, height=2)
         self.btn_run.pack(pady=10)
 
-        self.status_lbl = tk.Label(root, text="Čakám na súbory...", fg="gray")
+        self.status_lbl = tk.Label(root, text="Waiting for files...", fg="gray")
         self.status_lbl.pack(pady=5)
 
     def load_file(self, measure_num):
@@ -45,212 +45,238 @@ class BeeStatAnalyzer:
         if path:
             try:
                 df = pd.read_excel(path)
-                df['Meranie_ID'] = measure_num
-                df['Meranie_Nazov'] = f"{measure_num}. Meranie"
+                
+                # Data cleaning and numeric conversion
+                # IMPORTANT: Your Excel columns should now match these names
+                cols_to_numeric = ['Paraffin_Percentage', 'Drawn_Out_Percentage', 'Honey_Percentage', 'Brood_Percentage']
+                for c in cols_to_numeric:
+                    if c in df.columns:
+                        df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0)
+                        
+                df['Measurement_ID'] = measure_num
+                df['Measurement_Name'] = f"Measurement {measure_num}"
                 self.data_frames[measure_num] = df
                 
                 btn = [self.btn_1, self.btn_2, self.btn_3][measure_num-1]
-                btn.config(bg="#ccffcc", text=f"Meranie {measure_num}: {os.path.basename(path)}")
+                btn.config(bg="#ccffcc", text=f"Measurement {measure_num}: {os.path.basename(path)}")
                 
                 if len(self.data_frames) == 3:
                     self.btn_run.config(state=tk.NORMAL)
-                    self.status_lbl.config(text="Pripravené.", fg="green")
+                    self.status_lbl.config(text="Ready.", fg="green")
             except Exception as e:
-                messagebox.showerror("Chyba", f"Chyba pri načítaní: {e}")
+                messagebox.showerror("Error", f"Loading failed: {e}")
 
     def run_analysis(self):
-        # Spojenie dát
+        # Merge dataframes
         df_list = [self.data_frames[1], self.data_frames[2], self.data_frames[3]]
         self.merged_df = pd.concat(df_list, ignore_index=True)
         
-        output_dir = "Vystup_Vedecka_Analyza"
+        output_dir = "PostHoc_Analysis_Results"
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
         try:
-            # === GENERUJEME GRAFY ===
+            # === GENERATING CHARTS ===
             
-            # 1. PARAFÍN vs VYSTAVANIE (Všetko)
+            # 1. PARAFFIN vs COMB CONSTRUCTION (Overall)
             self.create_significance_plot(
                 data=self.merged_df,
-                x="Parafin_Percento",
-                y="Vystavane_Percent",
-                title="Vplyv parafínu na Vystavanie (Celkovo)",
-                filename=f"{output_dir}/1_Parafin_Vystavanie_SD.png",
-                ylabel="Vystavaná plocha (%)"
+                x="Paraffin_Percentage",
+                y="Drawn_Out_Percentage",
+                title="Impact of Paraffin on Comb Construction (Overall)",
+                filename=f"{output_dir}/1_Paraffin_Drawing_PostHoc.png",
+                ylabel="Drawn-out Area (%)",
+                fix_100=True
             )
 
-            # 2. PARAFÍN vs MED (Len Medník)
-            df_mednik = self.merged_df[self.merged_df['Lokacia'] == 'Medník']
-            if not df_mednik.empty:
+            # 2. PARAFFIN vs HONEY (Honey Supers Only)
+            df_honey_super = self.merged_df[self.merged_df['Location'] == 'Honey Super']
+            if not df_honey_super.empty:
                 self.create_significance_plot(
-                    data=df_mednik,
-                    x="Parafin_Percento",
-                    y="Med_Percent",
-                    title="Vplyv parafínu na zásoby MEDU (Medníky)",
-                    filename=f"{output_dir}/2_Parafin_MED_Mednik_SD.png",
-                    ylabel="Plocha Medu (%)"
+                    data=df_honey_super,
+                    x="Paraffin_Percentage",
+                    y="Honey_Percentage",
+                    title="Impact of Paraffin on Honey Storage (Honey Supers)",
+                    filename=f"{output_dir}/2_Paraffin_Honey_PostHoc.png",
+                    ylabel="Honey Area (%)",
+                    fix_100=False
                 )
 
-            # 3. PARAFÍN vs PLOD (Len Plodisko)
-            df_plodisko = self.merged_df[self.merged_df['Lokacia'] == 'Plodisko']
-            if not df_plodisko.empty:
+            # 3. PARAFFIN vs BROOD (Brood Chambers Only)
+            df_brood_chamber = self.merged_df[self.merged_df['Location'] == 'Brood Chamber']
+            if not df_brood_chamber.empty:
                 self.create_significance_plot(
-                    data=df_plodisko,
-                    x="Parafin_Percento",
-                    y="Plod_Percent",
-                    title="Vplyv parafínu na PLODOVANIE (Plodiská)",
-                    filename=f"{output_dir}/3_Parafin_PLOD_Plodisko_SD.png",
-                    ylabel="Plocha Plodu (%)"
+                    data=df_brood_chamber,
+                    x="Paraffin_Percentage",
+                    y="Brood_Percentage",
+                    title="Impact of Paraffin on Brood Rearing (Brood Chambers)",
+                    filename=f"{output_dir}/3_Paraffin_Brood_PostHoc.png",
+                    ylabel="Brood Area (%)",
+                    fix_100=False
                 )
 
-            # 4. MEDNÍK vs PLODISKO (Barplot)
+            # 4. HONEY SUPER vs BROOD CHAMBER (Comparison Barplot)
             plt.figure(figsize=(10, 6))
             ax = sns.barplot(
                 data=self.merged_df, 
-                x="Meranie_Nazov", 
-                y="Vystavane_Percent", 
-                hue="Lokacia", 
+                x="Measurement_Name", 
+                y="Drawn_Out_Percentage", 
+                hue="Location", 
                 palette="viridis",
-                errorbar='sd', # Štandardná odchýlka
+                errorbar='sd',
                 capsize=.1
             )
-            plt.title("Porovnanie Plodisko vs. Medník (+ SD)")
-            plt.ylabel("Vystavané (%)")
-            plt.ylim(bottom=0) # Len spodný limit, horný je dynamický
-            plt.savefig(f"{output_dir}/4_Porovnanie_Lokacii_SD.png")
+            plt.title("Comparison: Brood Chamber vs. Honey Super (+ SD)")
+            plt.ylabel("Drawn-out Area (%)")
+            plt.ylim(0, 100)
+            plt.savefig(f"{output_dir}/4_Location_Comparison_SD.png")
             plt.close()
 
-            # === EXPORT DO EXCELU ===
+            # === EXPORT TO EXCEL ===
             self.export_stats_excel(output_dir)
 
-            messagebox.showinfo("Hotovo", f"Analýza dokončená!\n\nLegenda ku grafom:\n* = Štatisticky významný rozdiel oproti 0% (p<0.05)\nZvislé čiary = Štandardná odchýlka\n\nSúbory sú v: {output_dir}")
+            messagebox.showinfo("Done", f"Analysis complete!\n\n* = Significant difference (with Bonferroni correction, p<0.05)\n\nFiles saved in: {output_dir}")
 
         except Exception as e:
-            messagebox.showerror("Chyba", f"Chyba pri generovaní: {e}")
+            messagebox.showerror("Error", f"Generation failed: {e}")
             print(e)
 
-    def create_significance_plot(self, data, x, y, title, filename, ylabel):
-        """
-        Univerzálna funkcia na vytvorenie grafu s T-testom voči 0%.
-        """
+    def create_significance_plot(self, data, x, y, title, filename, ylabel, fix_100=False):
         plt.figure(figsize=(11, 7))
         
-        # 1. Vykreslenie grafu s SD
         ax = sns.lineplot(
             data=data, 
             x=x, 
             y=y, 
-            hue="Meranie_Nazov", 
-            style="Meranie_Nazov",
+            hue="Measurement_Name", 
+            style="Measurement_Name",
             markers=True, 
             dashes=False, 
             linewidth=2,
-            errorbar='sd', # Zobrazujeme Štandardnú odchýlku
+            errorbar='sd',
             err_style="bars",
             err_kws={'capsize': 5}
         )
 
-        # 2. Výpočet štatistickej významnosti voči 0%
-        # Získame unikátne merania
-        merania = data['Meranie_Nazov'].unique()
-        parafin_levels = sorted(data[x].unique())
+        measures = data['Measurement_Name'].unique()
+        paraffin_levels = sorted(data[x].unique())
         
-        # Pre každé meranie (jún, júl...) zvlášť
-        for meranie in merania:
-            subset = data[data['Meranie_Nazov'] == meranie]
-            
-            # Baseline dáta (0% parafín pre dané meranie)
+        for measure in measures:
+            subset = data[data['Measurement_Name'] == measure]
             baseline_data = subset[subset[x] == 0][y]
             
             if len(baseline_data) < 2:
-                continue # Nemáme dosť dát na porovnanie
+                continue 
             
-            # Iterujeme cez ostatné úrovne parafínu (10, 20...)
-            for level in parafin_levels:
+            # Number of comparisons for Bonferroni correction
+            comparison_count = len([l for l in paraffin_levels if l != 0])
+            
+            for level in paraffin_levels:
                 if level == 0: continue
                 
                 compare_data = subset[subset[x] == level][y]
-                
                 if len(compare_data) < 2: 
                     continue
 
-                # T-TEST
-                stat, p_val = stats.ttest_ind(baseline_data, compare_data, equal_var=False)
-                
-                # Ak je významný rozdiel (p < 0.05)
-                if p_val < 0.05:
-                    # Nájdeme súradnice pre hviezdičku
-                    mean_val = compare_data.mean()
-                    std_val = compare_data.std()
+                try:
+                    u_stat, p_val_raw = stats.mannwhitneyu(baseline_data, compare_data, alternative='two-sided')
                     
-                    # Offset pre text (aby bol nad chybovou úsečkou)
-                    # Ak je std NaN (jeden bod), použijeme malý offset
-                    offset = std_val if not pd.isna(std_val) else 0
+                    # POST-HOC CORRECTION (Bonferroni)
+                    p_val_adj = min(p_val_raw * comparison_count, 1.0)
                     
-                    # Pridanie hviezdičky do grafu
-                    # Musíme nájsť farbu čiary pre dané meranie, ale pre zjednodušenie dáme červenú
-                    plt.text(
-                        x=level, 
-                        y=mean_val + offset + (data[y].max() * 0.02), # Trochu nad SD
-                        s="*", 
-                        color='red', 
-                        fontweight='bold', 
-                        fontsize=14,
-                        ha='center'
-                    )
+                    # Add star marker only if significant AFTER correction
+                    if p_val_adj < 0.05:
+                        mean_val = compare_data.mean()
+                        std_val = compare_data.std() if not pd.isna(compare_data.std()) else 0
+                        
+                        y_pos = mean_val + std_val + (data[y].max() * 0.02)
+                        if fix_100 and y_pos > 98:
+                            y_pos = 98
+                            
+                        plt.text(
+                            x=level, 
+                            y=y_pos, 
+                            s="*", 
+                            color='red', 
+                            fontweight='bold', 
+                            fontsize=16,
+                            ha='center'
+                        )
+                except Exception:
+                    pass
 
         plt.title(title)
         plt.ylabel(ylabel)
-        plt.xlabel("Obsah Parafínu (%)")
-        plt.ylim(bottom=0) # Dynamická Y os (len spodok fixujeme na 0)
+        plt.xlabel("Paraffin Content (%)")
+        
+        if fix_100:
+            plt.ylim(0, 100)
+        else:
+            plt.ylim(bottom=0)
+            current_top = plt.ylim()[1]
+            if current_top > 100:
+                plt.ylim(0, 100)
+
         plt.grid(True, alpha=0.3)
-        plt.legend(title="Meranie")
+        plt.legend(title="Measurement")
         plt.savefig(filename)
         plt.close()
 
     def export_stats_excel(self, output_dir):
-        """Urobí detailný export p-hodnôt do Excelu"""
         stats_rows = []
         
-        # Pre každú kombináciu: Meranie + Lokácia + Premenná
         scenarios = [
-            ("Vystavanie", "Vystavane_Percent"),
-            ("Množstvo Medu", "Med_Percent"),
-            ("Množstvo Plodu", "Plod_Percent")
+            ("Comb Construction", "Drawn_Out_Percentage"),
+            ("Honey Storage", "Honey_Percentage"),
+            ("Brood Rearing", "Brood_Percentage")
         ]
         
         for name_metric, col_metric in scenarios:
-            for meranie in self.merged_df['Meranie_Nazov'].unique():
-                subset = self.merged_df[self.merged_df['Meranie_Nazov'] == meranie]
-                baseline = subset[subset['Parafin_Percento'] == 0][col_metric]
+            if col_metric not in self.merged_df.columns: continue
+            
+            for measure in self.merged_df['Measurement_Name'].unique():
+                subset = self.merged_df[self.merged_df['Measurement_Name'] == measure]
+                baseline = subset[subset['Paraffin_Percentage'] == 0][col_metric]
                 
                 if len(baseline) < 2: continue
                 
-                for level in sorted(subset['Parafin_Percento'].unique()):
-                    if level == 0: continue
-                    
-                    group = subset[subset['Parafin_Percento'] == level][col_metric]
+                # Get comparison count for Post-hoc
+                levels_to_compare = [l for l in sorted(subset['Paraffin_Percentage'].unique()) if l != 0]
+                comparison_count = len(levels_to_compare)
+                
+                for level in levels_to_compare:
+                    group = subset[subset['Paraffin_Percentage'] == level][col_metric]
                     if len(group) < 2: continue
                     
-                    t_stat, p_val = stats.ttest_ind(baseline, group, equal_var=False)
-                    significance = "VÝZNAMNÝ" if p_val < 0.05 else "Nevýznamný"
+                    try:
+                        u_stat, p_val_raw = stats.mannwhitneyu(baseline, group, alternative='two-sided')
+                        
+                        # POST-HOC CORRECTION (Bonferroni)
+                        p_val_adj = min(p_val_raw * comparison_count, 1.0)
+                        
+                        significance = "SIGNIFICANT" if p_val_adj < 0.05 else "Non-significant"
+                    except:
+                        p_val_raw = "N/A"
+                        p_val_adj = "N/A"
+                        significance = "Error"
                     
                     stats_rows.append({
-                        "Meranie": meranie,
+                        "Measurement": measure,
                         "Parameter": name_metric,
-                        "Porovnanie": f"{level}% vs 0%",
-                        "Rozdiel_Priemerov": round(group.mean() - baseline.mean(), 2),
-                        "P-hodnota": round(p_val, 4),
-                        "Záver": significance
+                        "Comparison": f"{level}% vs 0%",
+                        "Mean_Difference": round(group.mean() - baseline.mean(), 2),
+                        "P-value (Original)": round(p_val_raw, 4) if isinstance(p_val_raw, float) else p_val_raw,
+                        "P-value (Bonferroni Post-Hoc)": round(p_val_adj, 4) if isinstance(p_val_adj, float) else p_val_adj,
+                        "Conclusion (Post-Hoc)": significance
                     })
 
         df_stats = pd.DataFrame(stats_rows)
-        excel_path = f"{output_dir}/Statistika_P_hodnoty.xlsx"
+        excel_path = f"{output_dir}/PostHoc_Statistics.xlsx"
         
         with pd.ExcelWriter(excel_path) as writer:
-            self.merged_df.to_excel(writer, sheet_name='Zdrojove_Data', index=False)
-            df_stats.to_excel(writer, sheet_name='T-testy_voci_kontrole', index=False)
+            if not df_stats.empty:
+                df_stats.to_excel(writer, sheet_name='Mann-Whitney_PostHoc', index=False)
+            self.merged_df.to_excel(writer, sheet_name='Raw_Data', index=False)
 
 if __name__ == "__main__":
     root = tk.Tk()
