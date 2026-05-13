@@ -3,7 +3,6 @@ from tkinter import filedialog, messagebox
 import os
 import pandas as pd
 from PIL import Image, ImageTk
-
 class ManualBeeAnalyzer:
     def __init__(self, root):
         self.root = root
