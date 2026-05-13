@@ -7,7 +7,7 @@ from PIL import Image, ImageTk
 class ManualBeeAnalyzer:
     def __init__(self, root):
         self.root = root
-        self.root.title("Analysis of Beeswax Foundations 4.0 - Measurement Tool")
+        self.root.title("Analysis of Beeswax Foundations 4.1 - Measurement Tool")
         self.root.geometry("1200x800")
 
         # -- Data Variables --

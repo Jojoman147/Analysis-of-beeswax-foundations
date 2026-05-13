@@ -13,7 +13,7 @@ sns.set_theme(style="whitegrid")
 class BeeStatAnalyzer:
     def __init__(self, root):
         self.root = root
-        self.root.title("AOBF Statistics 4.0 (Mann-Whitney + Post-Hoc)")
+        self.root.title("AOBF Statistics 4.1 (Mann-Whitney + Post-Hoc)")
         self.root.geometry("650x600")
 
         self.data_frames = {} 
